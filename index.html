@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b3b3c" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>The Journey of Patience</title>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="dist-box"><div><span id="dist">0</span><small>m</small></div><div id="tier">Easy</div></div>
+      <div id="surah-slots"></div>
+      <button id="btn-pause" class="round" aria-label="Pause">❚❚</button>
+    </div>
+    <div id="hud-health">
+      <div id="hearts"><span class="heart">❤️</span><span class="heart">❤️</span><span class="heart">❤️</span></div>
+      <div id="zam"><span class="drop">💧</span><span id="zam-text">Health full</span></div>
+      <div id="sabr"><span>🌴 Sabr</span><div class="sabr-bar"><div id="sabr-fill"></div></div></div>
+    </div>
+    <div id="hitnote"></div>
+    <div id="toast"></div>
+    <div id="banner"></div>
+    <div id="notifs"></div>
+  </div>
+
+  <div id="ach-toast"></div>
+  <div id="flash"></div>
+  <div id="fps" class="hidden"></div>
+
+  <!-- Screens -->
+  <section id="loading" class="screen solid">
+    <div class="card">
+      <h1 class="title">The Journey<br />of Patience</h1>
+      <div class="bar"><div id="load-bar"></div></div>
+      <p id="load-text">Loading…</p>
+    </div>
+  </section>
+
+  <section id="menu" class="screen hidden">
+    <div class="card">
+      <h1 class="title">The Journey<br />of Patience</h1>
+      <p class="sub">Run. Dodge distractions. Collect three Surahs.</p>
+      <div id="model-warning" class="warn hidden">Character file not found. Put <b>runnerboy.glb</b> in <b>public/models/</b> and refresh.</div>
+      <button id="btn-play" class="big">Play</button>
+      <button id="btn-tutorial" class="ghost">How to play</button>
+      <button id="btn-ach" class="ghost">Achievements</button>
+      <button id="btn-sound" class="ghost">Sound effects: On</button>
+      <button id="btn-music" class="ghost">Music: On</button>
+      <p class="best">Best run: <b id="best">0</b> m</p>
+    </div>
+  </section>
+
+  <section id="tutorial" class="screen hidden">
+    <div class="card">
+      <h2>How to play</h2>
+            <p class="hint strong">Collect these three Surahs</p>
+      <div class="surah-row">
+        <div class="surah-card">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="12" y="5" width="40" height="6" rx="3" fill="#ffd36b"/><rect x="12" y="53" width="40" height="6" rx="3" fill="#ffd36b"/><polygon points="17,11 47,11 32,31" fill="#16c784"/><polygon points="32,33 17,53 47,53" fill="#16c784"/><polygon points="25,53 39,53 32,41" fill="#ffe08a"/></svg>
+          <span class="ar" dir="rtl">العصر</span><small>Al-Asr</small>
+        </div>
+        <div class="surah-card">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><mask id="cm"><rect width="64" height="64" fill="white"/><circle cx="41" cy="25" r="20" fill="black"/></mask><circle cx="28" cy="34" r="24" fill="#ffd36b" mask="url(#cm)"/><polygon points="46,22 49,30 57,32 49,34 46,42 43,34 35,32 43,30" fill="#6fb3ff"/></svg>
+          <span class="ar" dir="rtl">الشرح</span><small>Ash-Sharh</small>
+        </div>
+        <div class="surah-card">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="13" width="38" height="38" fill="#fff3c4"/><rect x="13" y="13" width="38" height="38" fill="#ffd36b" transform="rotate(45 32 32)"/><circle cx="32" cy="32" r="8" fill="#ff6b8a"/></svg>
+          <span class="ar" dir="rtl">الإخلاص</span><small>Al-Ikhlas</small>
+        </div>
+      </div>
+      <ul class="how">
+        <li><b>Swipe left / right</b> to change lane</li>
+        <li><b>Swipe up</b> to jump over barriers and bottles</li>
+        <li><b>Swipe down</b> to slide under televisions</li>
+        <li><b>Change lane</b> to dodge anything tall (phones, cars, mirrors)</li>
+        <li><b>Zamzam</b> 💧 restores one life</li>
+        <li><b>Dates</b> 🌴 fill your Sabr meter. When it is full, patience shields you for a few seconds</li>
+        <li>Collect all <b>three Surahs</b> to unlock Tilawat</li>
+        <li>Fog, rain and distraction rushes will test you. It gets harder the longer you last.</li>
+      </ul>
+      <p class="hint">Keyboard: arrows or A / D / W / S · P to pause</p>
+      <button id="btn-tut-start" class="big">Start</button>
+      <button id="btn-tut-back" class="ghost">Back</button>
+    </div>
+  </section>
+
+  <section id="pause" class="screen hidden">
+    <div class="card">
+      <h2>Paused</h2>
+      <button id="btn-resume" class="big">Resume</button>
+      <button id="btn-restart" class="ghost">Restart</button>
+      <button id="btn-quit" class="ghost">Main menu</button>
+    </div>
+  </section>
+
+  <section id="over" class="screen hidden">
+    <div class="card">
+      <h2>Be patient, try again</h2>
+      <p class="score"><b id="over-score">0</b> m</p>
+      <p class="best">Best run: <b id="over-best">0</b> m · Surahs: <b id="over-surahs">0</b>/3</p>
+      <button id="btn-retry" class="big">Try again</button>
+      <button id="btn-over-menu" class="ghost">Main menu</button>
+    </div>
+  </section>
+
+  <section id="ach" class="screen hidden">
+    <div class="card">
+      <h2>Achievements</h2>
+      <p id="ach-count" class="hint"></p>
+      <ul id="ach-list" class="ach-list"></ul>
+      <button id="btn-ach-back" class="big">Back</button>
+    </div>
+  </section>
+
+  <section id="victory" class="screen hidden">
+    <div class="card">
+      <h2>Journey complete</h2>
+      <p class="sub">You collected all three Surahs. Patience wins.</p>
+      <p class="score"><b id="win-score">0</b> m</p>
+      <button id="btn-tilawat" class="big">▶ Replay Tilawat</button>
+      <p id="tilawat-status" class="hint"></p>
+      <button id="btn-again" class="ghost">Play again</button>
+      <button id="btn-win-menu" class="ghost">Main menu</button>
+    </div>
+  </section>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

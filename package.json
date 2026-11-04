@@ -1,0 +1,18 @@
+{
+  "name": "journey-of-patience",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "optimize": "npx -y @gltf-transform/cli optimize assets-src/Runnerboy.glb public/models/runnerboy.glb --compress meshopt --texture-compress webp --texture-size 1024"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}
