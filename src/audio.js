@@ -1,5 +1,6 @@
 import { SURAHS } from './config.js';
 import { storage } from './storage.js';
+import { music } from './music.js';
 
 // ---------- Web Audio context ----------
 let ctx = null;
@@ -78,6 +79,7 @@ const HIT_BY_CAT = {
 };
 const CUE_BY_NAME = {
   notify: () => gate('notify', 700) && (tone(1175, 0.09, { vol: 0.07 }), tone(1568, 0.14, { vol: 0.07, delay: 0.09 })),
+  rumble: () => gate('rumble', 1200) && noise(0.9, { vol: 0.2, filter: 'lowpass', freq: 160 }),
   horn:   () => gate('horn', 1500) && (tone(392, 0.28, { type: 'sawtooth', vol: 0.06 }), tone(494, 0.28, { type: 'sawtooth', vol: 0.05 })),
 };
 
@@ -98,6 +100,8 @@ export const sfx = {
   banner: () => tone(300, 0.3, { type: 'triangle', vol: 0.1, to: 450 }),
   date: (n = 0) => tone(900 + n * 70, 0.09, { type: 'triangle', vol: 0.09 }),
   sabr: () => { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.5, { type: 'sine', vol: 0.11, delay: i * 0.07 })); },
+  ayah: (n = 1) => { tone(740 + n * 40, 0.14, { vol: 0.14 }); tone(1110 + n * 50, 0.26, { vol: 0.12, delay: 0.08 }); },
+  level: () => { [392, 587, 784, 1175, 1568].forEach((f, i) => tone(f, 0.7, { type: 'sine', vol: 0.12, delay: i * 0.09 })); noise(0.8, { vol: 0.05, filter: 'highpass', freq: 4000 }); },
   thunder: () => { noise(1.6, { vol: 0.3, filter: 'lowpass', freq: 220 }); },
 };
 
@@ -132,23 +136,24 @@ const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAA
 const player = new Audio();
 player.preload = 'auto';
 let index = 0;
+let list = [];
 let active = false;
 let onStatus = () => {};
 
 function playCurrent() {
-  const s = SURAHS[index];
+  const s = SURAHS[list[index]];
   if (!s) { onStatus('Tilawat finished. You can play it again.'); active = false; exclusive = false; return; }
-  onStatus(`Playing ${index + 1}/${SURAHS.length}: ${s.name}`);
+  onStatus(`Now playing Surah ${s.name} (${index + 1}/${list.length})`);
   player.src = s.file;
   const p = player.play();
-  if (p && p.catch) p.catch(() => { onStatus('Tap "Replay Tilawat" to listen.'); active = false; exclusive = false; });
+  if (p && p.catch) p.catch(() => { onStatus('Tap "Replay Tilawat" to listen.'); active = false; exclusive = false; music.resume(); });
 }
 
 player.addEventListener('ended', () => { if (!active) return; index++; playCurrent(); });
 player.addEventListener('error', () => {
   if (!active) return;
-  const s = SURAHS[index];
-  if (s) { onStatus(`Missing audio file: ${s.file} (add it to public/audio/)`); exclusive = false; }
+  const s = SURAHS[list[index]];
+  if (s) { onStatus(`Missing audio file: ${s.file} (add it to public/audio/)`); exclusive = false; music.resume(); }
 });
 
 export const tilawat = {
@@ -159,6 +164,9 @@ export const tilawat = {
     const p = player.play();
     if (p && p.then) p.then(() => player.pause()).catch(() => {});
   },
-  start(statusCb) { active = true; exclusive = true; onStatus = statusCb || (() => {}); index = 0; playCurrent(); },
-  stop() { active = false; exclusive = false; player.pause(); },
+  start(statusCb, ids) {
+    list = ids && ids.length ? ids.slice() : SURAHS.map((x) => x.id);
+    active = true; exclusive = true; music.pause(); onStatus = statusCb || (() => {}); index = 0; playCurrent();
+  },
+  stop() { active = false; exclusive = false; player.pause(); music.resume(); },
 };

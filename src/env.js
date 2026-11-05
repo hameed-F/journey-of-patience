@@ -27,7 +27,7 @@ const HILL_FAR = new THREE.Color(0x5f8f86), HILL_NEAR = new THREE.Color(0x3f7a5a
 
 class Rain {
   constructor(scene) {
-    this.n = 700;
+    this.n = (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 420 : 700;
     this.p = new Float32Array(this.n * 6);
     this.v = new Float32Array(this.n);
     for (let i = 0; i < this.n; i++) this.reset(i, true);

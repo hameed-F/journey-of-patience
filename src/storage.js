@@ -1,5 +1,5 @@
 const KEY = 'journey-of-patience-v1';
-const defaults = { best: 0, sound: true, music: true, tutorialSeen: false, ach: {} };
+const defaults = { best: 0, sound: true, music: true, tutorialSeen: false, ach: {}, done: {} };
 let data = { ...defaults };
 
 try {

@@ -1,7 +1,8 @@
 import { SURAHS, CFG, ACH } from './config.js';
+import { storage } from './storage.js';
 
 const $ = (id) => document.getElementById(id);
-const SCREENS = ['loading', 'menu', 'tutorial', 'pause', 'over', 'victory', 'ach'];
+const SCREENS = ['loading', 'menu', 'levels', 'tutorial', 'pause', 'over', 'victory', 'ach'];
 
 export function show(name) {
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== name);
@@ -45,9 +46,10 @@ export function setTier(name, silent) {
 }
 
 let toastTimer = 0;
-export function toast(text) {
+export function toast(text, arabic) {
   const t = $('toast');
   t.textContent = text;
+  t.classList.toggle('ar', !!arabic);
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 1300);
@@ -97,26 +99,58 @@ export function buildAch(have) {
 }
 
 export function setBest(v) { $('best').textContent = v; }
-export function setSoundLabel(on) { $('btn-sound').textContent = `Sound effects: ${on ? 'On' : 'Off'}`; }
-export function setMusicLabel(on) { $('btn-music').textContent = `Music: ${on ? 'On' : 'Off'}`; }
+export function setSoundLabel(on) { ['btn-sound', 'btn-sound-pause'].forEach((id) => { $(id).textContent = `Sound: ${on ? 'On' : 'Off'}`; $(id).classList.toggle('off', !on); }); }
 export function setLoad(p, text) {
   $('load-bar').style.width = `${Math.round(p * 100)}%`;
   if (text) $('load-text').textContent = text;
 }
 export const modelWarning = (on) => $('model-warning').classList.toggle('hidden', !on);
 
-export function showOver({ score, best, surahs }) {
+export function showOver({ score, best, surahs, recap, names }) {
   $('over-score').textContent = score;
   $('over-best').textContent = best;
   $('over-surahs').textContent = surahs;
+  $("tilawat-status-over").textContent = names.length ? `Surah ${names.join(', ')} is ready to listen` : '';
+  $('btn-over-tilawat').classList.toggle('hidden', !names.length);
+  $('over-recap').innerHTML = recapHtml(recap);
   show('over');
 }
-export function showVictory({ score }) {
+const recapHtml = (r) => r.map((a) => `<li><span class="ar" dir="rtl">${a.ar}</span><small>${a.s} · ${a.n}. ${a.en}</small></li>`).join('');
+export function showVictory({ score, recap }) {
+  $('win-recap').innerHTML = recapHtml(recap);
   $('win-score').textContent = score;
   $('tilawat-status').textContent = '';
   show('victory');
 }
-export const tilawatStatus = (t) => { $('tilawat-status').textContent = t; };
+export const tilawatStatus = (t) => document.querySelectorAll('.tstatus').forEach((e) => { e.textContent = t; });
+
+export function setTotalAyahs(n) { $('ayah-total').textContent = `AYAHS: ${n}`; }
+
+// the translated ayah banner (Arabic + English) shown on pickup
+let ayahTimer = 0;
+export function showAyah(S, n) {
+  const a = S.ayat[n - 1], b = $('ayah-banner');
+  b.innerHTML = `<div class="ab-ar" dir="rtl">${a.ar}</div><div class="ab-en">${a.en}</div>`;
+  b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  clearTimeout(ayahTimer);
+  ayahTimer = setTimeout(() => b.classList.remove('show'), 3800);
+}
+
+// golden glow when a new Surah level begins
+let glowTimer = 0;
+export function levelGlow(S, step) {
+  const g = $('level-glow');
+  g.innerHTML = `<div><small>LEVEL ${step} · SURAH ${S.num}</small><b class="ar" dir="rtl">سورة ${S.arabic}</b><span>${S.name} · ${S.ayahs} Ayahs</span></div>`;
+  g.classList.remove('go'); void g.offsetWidth; g.classList.add('go');
+  clearTimeout(glowTimer);
+}
+export const setLevelGlow = (on) => { if (!on) $('level-glow').classList.remove('go'); };
+
+export function buildLevels(onPick) {
+  const done = storage.get().done || {};
+  $('level-list').innerHTML = SURAHS.map((s) => `<button class="level" data-id="${s.id}"><span class="lv-n">${s.num}</span><span class="lv-t"><b class="ar" dir="rtl">${s.arabic}</b><span>${s.name}</span><small>${s.ayahs} Ayahs${done[s.id] ? ' · ✓ completed' : ''}</small></span></button>`).join('');
+  $('level-list').querySelectorAll('.level').forEach((el) => el.addEventListener('click', () => onPick(Number(el.dataset.id))));
+}
 
 export function setSabr(frac, active) {
   $('sabr-fill').style.width = `${Math.round(frac * 100)}%`;
@@ -133,4 +167,10 @@ export function hitNote(text, cat) {
   n.classList.remove('show'); void n.offsetWidth; n.classList.add('show');
   clearTimeout(noteTimer);
   noteTimer = setTimeout(() => n.classList.remove('show'), 1100);
+}
+
+// progress of the Surah being collected: name + one dot per ayah
+export function setAyahs(surahIdx, got, newN) {
+  const S0 = SURAHS[surahIdx];
+  $('ayah-bar').innerHTML = `<div class="sp-ic">📖</div><div class="sp-tx"><b>SURAH PROGRESS</b><span>SURAH ${S0.name.toUpperCase()}</span><small>(${got.size}/${S0.ayahs} AYAHS COLLECTED)</small></div>`;
 }

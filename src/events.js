@@ -1,7 +1,6 @@
 // Special gameplay events: Foggy Path, Rainstorm, Distraction Rush, Peaceful Stretch
 import * as UI from './ui.js';
 import { sfx, ambience } from './audio.js';
-import { music } from './music.js';
 
 const DEFS = {
   fog:   { name: 'Foggy Path',       sub: 'Visibility reduced',      dur: 13 },
@@ -30,14 +29,13 @@ export class Events {
     if (name === 'fog') g.env.target.fog = 1;
     if (name === 'rain') { g.env.target.rain = 1; ambience.rain(true); }
     if (name === 'rush') { g.mods.forceCat = 'digital'; g.mods.gapMul = 0.85; g.mods.rush = true; this.nt = 0.3; }
-    if (name === 'peace') { g.env.target.peace = 1; g.mods.calm = true; g.mods.gapMul = 1.7; g.mods.surahMul = 0.6; music.setCalm(true, g.tier); }
+    if (name === 'peace') { g.env.target.peace = 1; g.mods.calm = true; g.mods.gapMul = 1.7; g.mods.surahMul = 0.6; }
   }
 
   end(silent = false) {
     const g = this.game;
     g.env.target.fog = 0; g.env.target.rain = 0; g.env.target.peace = 0;
     ambience.rain(false);
-    if (this.cur === 'peace') music.setCalm(false, g.tier);
     g.mods = { gapMul: 1, calm: false, forceCat: null, rush: false, surahMul: 1 };
     this.cur = null;
     this.wait = 14 + Math.random() * 9;
@@ -49,7 +47,7 @@ export class Events {
       this.t -= dt;
       if (this.cur === 'rush') {
         this.nt -= dt;
-        if (this.nt <= 0) { const n = NOTES[Math.floor(Math.random() * NOTES.length)]; UI.notify(n[0], n[1]); sfx.cue('notify'); this.nt = 0.5 + Math.random() * 0.5; }
+        if (this.nt <= 0) { const n = NOTES[Math.floor(Math.random() * NOTES.length)]; UI.notify(n[0], n[1]); sfx.cue('notify'); this.nt = 0.9 + Math.random() * 0.6; }
       }
       if (this.t <= 0) this.end();
     } else {

@@ -71,9 +71,9 @@ if (new URLSearchParams(location.search).has('fps')) {
   UI.buildSlots();
   UI.setBest(storage.get().best);
   UI.setSoundLabel(storage.get().sound);
-  UI.setMusicLabel(storage.get().music);
   UI.setLoad(0.05, 'Loading…');
 
+  if (document.fonts && document.fonts.load) await Promise.race([document.fonts.load('bold 40px Amiri', 'بسم'), new Promise((r) => setTimeout(r, 1500))]).catch(() => {});
   const gltf = await loadModel();
   UI.setLoad(1, 'Ready');
   game = new Game(scene, camera, gltf, env, fx);
@@ -85,43 +85,47 @@ if (new URLSearchParams(location.search).has('fps')) {
 })();
 
 // ---------- UI wiring ----------
-function startGame() {
+let level = 0;
+function startGame(id) {
+  if (typeof id === 'number') level = id;
   unlock();
   tilawat.stop();
   tilawat.prime();            // runs inside a tap, so Tilawat can autoplay on victory
-  game.start();
+  music.start();
+  game.start(level);
+}
+function toggleSound() {
+  const on = !storage.get().sound;
+  storage.set({ sound: on });
+  UI.setSoundLabel(on);
+  music.setEnabled(on);                   // one switch controls music and effects
 }
 
 function wireUI() {
   const click = (id, fn) => $(id).addEventListener('click', () => { unlock(); sfx.click(); fn(); });
 
-  click('btn-play', () => (storage.get().tutorialSeen ? startGame() : UI.show('tutorial')));
+  const toLevels = () => { UI.buildLevels((id) => { unlock(); sfx.click(); startGame(id); }); UI.show('levels'); };
+  click('btn-play', () => (storage.get().tutorialSeen ? toLevels() : UI.show('tutorial')));
+  click('btn-levels-back', () => UI.show('menu'));
   click('btn-tutorial', () => UI.show('tutorial'));
-  click('btn-tut-start', () => { storage.set({ tutorialSeen: true }); startGame(); });
+  click('btn-tut-start', () => { storage.set({ tutorialSeen: true }); toLevels(); });
   click('btn-tut-back', () => UI.show('menu'));
   click('btn-ach', () => { UI.buildAch(unlocked()); UI.show('ach'); });
   click('btn-ach-back', () => UI.show('menu'));
-  click('btn-sound', () => {
-    const on = !storage.get().sound;
-    storage.set({ sound: on });
-    UI.setSoundLabel(on);
-  });
-  click('btn-music', () => {
-    const on = !storage.get().music;
-    storage.set({ music: on });
-    UI.setMusicLabel(on);
-    music.setEnabled(on);
-    if (on && game.state === 'playing') music.start();
-  });
+  click('btn-sound', toggleSound);
+  click('btn-sound-pause', toggleSound);
   click('btn-resume', () => game.resume());
-  click('btn-restart', startGame);
+  click('btn-restart', () => startGame());
   click('btn-quit', () => { UI.setBest(storage.get().best); game.toMenu(); });
-  click('btn-retry', startGame);
-  click('btn-again', startGame);
+  click('btn-retry', () => startGame());
+  click('btn-again', () => startGame());
+  const toLevelSelect = () => { UI.setBest(storage.get().best); game.toMenu(); toLevels(); };
+  click('btn-over-levels', toLevelSelect);
   const toMenu = () => { UI.setBest(storage.get().best); game.toMenu(); };
   click('btn-over-menu', toMenu);
   click('btn-win-menu', toMenu);
-  click('btn-tilawat', () => tilawat.start(UI.tilawatStatus));   // replay (a tap, so always allowed)
+  click('btn-tilawat', () => tilawat.start(UI.tilawatStatus, game.doneList));
+  click('btn-over-tilawat', () => tilawat.start(UI.tilawatStatus, game.doneList));   // replay (a tap, so always allowed)
 
   bindInput(canvas, {
     left: () => game.moveLane(-1),
@@ -131,22 +135,29 @@ function wireUI() {
     pause: () => (game.state === 'playing' ? game.pause() : game.state === 'paused' ? game.resume() : null),
   });
 
-  document.addEventListener('visibilitychange', () => { if (document.hidden) game.pause(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { game.pause(); music.hide(); } else music.show();
+  });
 }
+
+// the music file starts on the very first tap/key (browsers block sound before that)
+const firstGesture = () => { unlock(); music.start(); };
+addEventListener('pointerdown', firstGesture, { once: true });
+addEventListener('keydown', firstGesture, { once: true });
 
 // ---------- main loop + adaptive resolution ----------
 const clock = new THREE.Clock();
-let avgMs = 16.7, lastAdjust = 0, fpsAcc = 0, fpsFrames = 0;
+let avgMs = 16.7, lastAdjust = 0, lastLower = 0, fpsAcc = 0, fpsFrames = 0;
 
+// Lower the resolution only when the phone really struggles, and win it back when things are smooth again
 function adapt(ms, now) {
-  avgMs = avgMs * 0.95 + Math.min(ms, 100) * 0.05;
-  if (now - lastAdjust < 2000) return;
-  if (avgMs > 22 && pixelRatio > CFG.minPixelRatio) {
-    pixelRatio = Math.max(CFG.minPixelRatio, pixelRatio - 0.25);
-  } else if (avgMs < 14 && pixelRatio < Math.min(window.devicePixelRatio || 1, CFG.maxPixelRatio)) {
-    pixelRatio = Math.min(CFG.maxPixelRatio, pixelRatio + 0.25);
+  avgMs = avgMs * 0.93 + Math.min(ms, 100) * 0.07;
+  const maxPR = Math.min(window.devicePixelRatio || 1, CFG.maxPixelRatio);
+  if (avgMs > 25 && pixelRatio > CFG.minPixelRatio && now - lastAdjust > 1500) {
+    pixelRatio = Math.max(CFG.minPixelRatio, pixelRatio - 0.15); lastAdjust = lastLower = now;
+  } else if (avgMs < 18.5 && pixelRatio < maxPR && now - lastLower > 10000 && now - lastAdjust > 4000) {
+    pixelRatio = Math.min(maxPR, pixelRatio + 0.15); lastAdjust = now;
   } else return;
-  lastAdjust = now;
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(innerWidth, innerHeight);
 }

@@ -7,6 +7,9 @@ const GROUND_LEN = 150;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const PI = Math.PI;
+const LOW = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;   // phones: slightly lighter scenery
+const _kc = new Map();
+const kc = (hex) => { let c = _kc.get(hex); if (!c) { c = new THREE.Color(hex); _kc.set(hex, c); } return c; };
 
 // ---------------------------------------------------------------- textures
 function canvasTex(w, h, draw, rx, ry) {
@@ -101,10 +104,15 @@ const G = {
 const HOUSE = [0xf4d9a6, 0xf2c6a0, 0xe8e1cf, 0xcfe3d4, 0xf0b8a0, 0xd8e6f5, 0xf7e7b4, 0xe9cfa0].map((c) => new THREE.Color(c));
 const ROOF = [0xc4623c, 0x2b6f8a, 0x8a3b3b, 0x2f8a6b, 0x9b5b2f].map((c) => new THREE.Color(c));
 const LEAF = [0x3f9c4a, 0x58b35a, 0x2f8a55, 0x7cc46a, 0x4aa65a].map((c) => new THREE.Color(c));
-const WOOD = new THREE.Color(0x7b4f2e), DOOR = new THREE.Color(0x5b3a22), CREAM = new THREE.Color(0xf8f2e0), TEAL = new THREE.Color(0x1f9d8a);
-const GOLD = new THREE.Color(0xffd36b), WARM = new THREE.Color(1, 0.9, 0.6);
+const WOOD = kc(0x7b4f2e), DOOR = kc(0x5b3a22), CREAM = kc(0xf8f2e0), TEAL = kc(0x1f9d8a);
+const GOLD = kc(0xffd36b), WARM = new THREE.Color(1, 0.9, 0.6);
 const FANOUS = [0xff5a5a, 0xffd36b, 0x6dff9a, 0x6fb3ff, 0xff9ae6].map((c) => new THREE.Color(c));
-const STRIPES = [new THREE.Color(0xd94141), new THREE.Color(0xfff6e0)];
+const STRIPES = [kc(0xd94141), kc(0xfff6e0)];
+
+const TRIM = HOUSE.map((c) => c.clone().multiplyScalar(0.78));
+const BODYS = HOUSE.map((c) => c.clone().multiplyScalar(0.92));
+const BODYC = HOUSE.map((c) => c.clone().multiplyScalar(0.85));
+const ROOFD = ROOF.map((c) => c.clone().multiplyScalar(0.8));
 
 const dummy = new THREE.Object3D();
 const tmp = new THREE.Color();
@@ -140,23 +148,23 @@ function add(seg, key, x, y, z, sx, sy, sz, ry = 0, color = null, rx = 0, rz = 0
   m.setMatrixAt(i, dummy.matrix);
   if (color !== null) m.setColorAt(i, color.isColor ? color : tmp.setHex(color));
 }
-const shade = (c, k) => new THREE.Color().copy(c).multiplyScalar(k);
 
 function house(seg, s, x, z) {
   const type = Math.random();
   const w = rand(3, 4), d = rand(3, 4);
   const tower = type > 0.8, flat = type > 0.45 && !tower;
   const h = tower ? rand(6, 8) : rand(3.2, 5.2);
-  const body = pick(HOUSE), roof = pick(ROOF), trim = shade(body, 0.78);
+  const bi = (Math.random() * HOUSE.length) | 0, ri2 = (Math.random() * ROOF.length) | 0;
+  const body = HOUSE[bi], roof = ROOF[ri2], trim = TRIM[bi];
   const xf = x - s * (w / 2);                                   // wall facing the road
 
   add(seg, 'shadows', x - s * 0.4, -0.03, z, w * 1.5, 1, d * 1.4);
   add(seg, 'boxes', x, h / 2, z, w, h, d, 0, body);
   add(seg, 'boxes', x, 0.28, z, w + 0.16, 0.56, d + 0.16, 0, trim);          // plinth
-  add(seg, 'boxes', x, h * 0.5, z, w + 0.06, 0.1, d + 0.06, 0, trim);        // floor band
+  if (!LOW) add(seg, 'boxes', x, h * 0.5, z, w + 0.06, 0.1, d + 0.06, 0, trim);        // floor band
 
   if (flat) {
-    add(seg, 'boxes', x, h + 0.2, z, w + 0.24, 0.4, d + 0.24, 0, shade(body, 0.92));   // parapet
+    add(seg, 'boxes', x, h + 0.2, z, w + 0.24, 0.4, d + 0.24, 0, BODYS[bi]);   // parapet
     add(seg, 'boxes', x, h + 0.42, z, w + 0.34, 0.08, d + 0.34, 0, trim);
     if (Math.random() < 0.55) {                                                          // little dome + finial
       const dx = x + rand(-0.4, 0.4), dz = z + rand(-0.6, 0.6);
@@ -167,8 +175,8 @@ function house(seg, s, x, z) {
   } else {
     const rh = tower ? 2.4 : 1.6;
     add(seg, 'cones4', x, h + rh / 2, z, w * 0.84, rh, d * 0.84, PI / 4, roof);
-    add(seg, 'boxes', x, h + 0.06, z, w + 0.34, 0.14, d + 0.34, 0, shade(roof, 0.8));  // eaves
-    if (Math.random() < 0.5) add(seg, 'boxes', x + s * 0.5, h + 0.9, z + 0.6, 0.4, 1.1, 0.4, 0, shade(body, 0.85)); // chimney
+    add(seg, 'boxes', x, h + 0.06, z, w + 0.34, 0.14, d + 0.34, 0, ROOFD[ri2]);  // eaves
+    if (!LOW && Math.random() < 0.5) add(seg, 'boxes', x + s * 0.5, h + 0.9, z + 0.6, 0.4, 1.1, 0.4, 0, BODYC[bi]); // chimney
   }
 
   // door + lintel + lantern
@@ -188,8 +196,8 @@ function house(seg, s, x, z) {
       const zz = z + dz;
       add(seg, 'boxes', xf - s * 0.02, wy, zz, 0.08, 0.92, 0.72, 0, CREAM);
       add(seg, 'windows', xf - s * 0.07, wy, zz, 1, 1, 1, ry);
-      add(seg, 'boxes', xf - s * 0.1, wy - 0.5, zz, 0.2, 0.08, 0.8, 0, trim);        // sill
-      if (!flat) { add(seg, 'boxes', xf - s * 0.07, wy, zz - 0.42, 0.05, 0.8, 0.18, 0, TEAL); add(seg, 'boxes', xf - s * 0.07, wy, zz + 0.42, 0.05, 0.8, 0.18, 0, TEAL); }
+      if (!LOW) add(seg, 'boxes', xf - s * 0.1, wy - 0.5, zz, 0.2, 0.08, 0.8, 0, trim);        // sill
+      if (!flat && !LOW) { add(seg, 'boxes', xf - s * 0.07, wy, zz - 0.42, 0.05, 0.8, 0.18, 0, TEAL); add(seg, 'boxes', xf - s * 0.07, wy, zz + 0.42, 0.05, 0.8, 0.18, 0, TEAL); }
     }
   }
   if (tower) add(seg, 'boxes', xf - s * 0.4, h * 0.55, z, 0.8, 0.1, 2.0, 0, DOOR);    // balcony slab
@@ -198,20 +206,20 @@ function house(seg, s, x, z) {
 function mosque(seg, s, x, z) {
   add(seg, 'shadows', x, -0.03, z, 11, 1, 11);
   add(seg, 'boxes', x, 2.3, z, 7, 4.6, 7, 0, CREAM);
-  add(seg, 'boxes', x, 0.3, z, 7.35, 0.6, 7.35, 0, new THREE.Color(0xd9cfae));
-  add(seg, 'boxes', x, 4.7, z, 7.2, 0.25, 7.2, 0, new THREE.Color(0xe7dcc0));
+  add(seg, 'boxes', x, 0.3, z, 7.35, 0.6, 7.35, 0, kc(0xd9cfae));
+  add(seg, 'boxes', x, 4.7, z, 7.2, 0.25, 7.2, 0, kc(0xe7dcc0));
   add(seg, 'cyls', x, 5.1, z, 3.1, 0.7, 3.1, 0, CREAM);
   add(seg, 'domes', x, 5.4, z, 3.0, 3.1, 3.0, 0, TEAL);
   add(seg, 'cyls', x, 8.9, z, 0.07, 0.9, 0.07, 0, GOLD);
   add(seg, 'crescents', x, 9.6, z, 1.1, 1.1, 1.1, PI / 2, null, 0, PI * 0.2);
   for (const [dx, dz] of [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4]]) {
     add(seg, 'cyls', x + dx, 4.9, z + dz, 1.0, 0.5, 1.0, 0, CREAM);
-    add(seg, 'domes', x + dx, 5.15, z + dz, 1.0, 1.1, 1.0, 0, new THREE.Color(0x35b3a0));
+    add(seg, 'domes', x + dx, 5.15, z + dz, 1.0, 1.1, 1.0, 0, kc(0x35b3a0));
   }
   const xf = x - s * 3.5, ry = s > 0 ? -PI / 2 : PI / 2;
-  add(seg, 'boxes', xf - s * 0.1, 1.5, z, 0.2, 3.0, 2.4, 0, new THREE.Color(0xe7dcc0));   // portal
-  add(seg, 'boxes', xf - s * 0.2, 1.3, z, 0.12, 2.6, 1.7, 0, new THREE.Color(0x244a52));
-  add(seg, 'domes', xf - s * 0.2, 2.6, z, 0.12, 0.85, 0.85, 0, new THREE.Color(0x244a52), 0, 0);
+  add(seg, 'boxes', xf - s * 0.1, 1.5, z, 0.2, 3.0, 2.4, 0, kc(0xe7dcc0));   // portal
+  add(seg, 'boxes', xf - s * 0.2, 1.3, z, 0.12, 2.6, 1.7, 0, kc(0x244a52));
+  add(seg, 'domes', xf - s * 0.2, 2.6, z, 0.12, 0.85, 0.85, 0, kc(0x244a52), 0, 0);
   for (const dz of [-2.2, 2.2]) for (const wy of [1.6, 3.4]) { add(seg, 'windows', xf - s * 0.06, wy, z + dz, 1, 1.5, 1, ry); add(seg, 'boxes', xf - s * 0.02, wy, z + dz, 0.08, 1.2, 0.8, 0, CREAM); }
   for (const dz of [-3.9, 3.9]) {                                                            // two minarets
     const mx = x - s * 4.3, mz = z + dz;
@@ -240,14 +248,14 @@ function plant(seg, s, x, z) {
   } else if (r < 0.75) {                                        // date palm
     const hgt = rand(3.4, 4.2);
     add(seg, 'cyls', x, hgt / 2, z, 0.17, hgt, 0.17, 0, WOOD);
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * PI * 2 + rand(-0.15, 0.15);
+    for (let i = 0, nf = LOW ? 6 : 8; i < nf; i++) {
+      const a = (i / nf) * PI * 2 + rand(-0.15, 0.15);
       add(seg, 'boxes', x + Math.cos(a) * 0.95, hgt + 0.05, z + Math.sin(a) * 0.95, 2.1, 0.05, 0.38, -a, pick(LEAF), 0, -0.4);
     }
-    for (let i = 0; i < 3; i++) add(seg, 'icos', x + rand(-0.25, 0.25), hgt - 0.2, z + rand(-0.25, 0.25), 0.16, 0.2, 0.16, 0, new THREE.Color(0x8a4b1f));
+    for (let i = 0; i < 3; i++) add(seg, 'icos', x + rand(-0.25, 0.25), hgt - 0.2, z + rand(-0.25, 0.25), 0.16, 0.2, 0.16, 0, kc(0x8a4b1f));
   } else {                                                      // cypress
     add(seg, 'cyls', x, 0.4, z, 0.14, 0.8, 0.14, 0, WOOD);
-    add(seg, 'icos', x, 2.3, z, 0.6, 2.2, 0.6, 0, new THREE.Color(0x2f7a47));
+    add(seg, 'icos', x, 2.3, z, 0.6, 2.2, 0.6, 0, kc(0x2f7a47));
   }
 }
 
@@ -262,8 +270,8 @@ function bush(seg, s, x, z) {
 
 function stall(seg, s, x, z) {
   add(seg, 'shadows', x, -0.03, z, 2.4, 1, 3);
-  add(seg, 'boxes', x, 0.45, z, 0.9, 0.9, 2.0, 0, new THREE.Color(0xa5703a));
-  add(seg, 'boxes', x + s * 0.5, 1.2, z, 0.08, 2.4, 2.1, 0, new THREE.Color(0x8a5a2b));            // back panel
+  add(seg, 'boxes', x, 0.45, z, 0.9, 0.9, 2.0, 0, kc(0xa5703a));
+  add(seg, 'boxes', x + s * 0.5, 1.2, z, 0.08, 2.4, 2.1, 0, kc(0x8a5a2b));            // back panel
   for (const dz of [-0.95, 0.95]) { add(seg, 'cyls', x - s * 0.42, 1.1, z + dz, 0.05, 2.2, 0.05, 0, WOOD); }
   for (let k = 0; k < 6; k++) add(seg, 'boxes', x - s * 0.02, 2.25 - 0.0, z - 0.93 + k * 0.372, 1.3, 0.06, 0.37, 0, STRIPES[k % 2], 0, s * 0.24);
   for (let i = 0; i < 6; i++) add(seg, 'icos', x - s * 0.05, 1.0, z - 0.8 + i * 0.32, 0.13, 0.13, 0.13, 0, pick([0xd94141, 0xff9f1c, 0x6cc070, 0xffd54a]));
@@ -272,9 +280,9 @@ function stall(seg, s, x, z) {
 
 function streetLamp(seg, s, z) {
   const x = s * 4.7;
-  add(seg, 'cyls', x, 0.2, z, 0.2, 0.4, 0.2, 0, new THREE.Color(0x2f3b44));
-  add(seg, 'cyls', x, 1.7, z, 0.065, 3.3, 0.065, 0, new THREE.Color(0x2f3b44));
-  add(seg, 'boxes', x - s * 0.28, 3.28, z, 0.56, 0.06, 0.06, 0, new THREE.Color(0x2f3b44));
+  add(seg, 'cyls', x, 0.2, z, 0.2, 0.4, 0.2, 0, kc(0x2f3b44));
+  add(seg, 'cyls', x, 1.7, z, 0.065, 3.3, 0.065, 0, kc(0x2f3b44));
+  add(seg, 'boxes', x - s * 0.28, 3.28, z, 0.56, 0.06, 0.06, 0, kc(0x2f3b44));
   add(seg, 'balls', x - s * 0.5, 3.05, z, 0.2, 0.3, 0.2, 0, WARM);
   add(seg, 'cones8', x - s * 0.5, 3.42, z, 0.26, 0.22, 0.26, 0, GOLD);
   add(seg, 'glows', x - s * 0.5, 3.05, z, 0.8, 0.8, 0.8);
@@ -283,15 +291,15 @@ function streetLamp(seg, s, z) {
 
 function fanousString(seg) {
   const z = rand(-7, 7);
-  for (const s of [-1, 1]) add(seg, 'cyls', s * 5.0, 3.0, z, 0.07, 6, 0.07, 0, new THREE.Color(0x2f3b44));
-  add(seg, 'boxes', 0, 5.95, z, 10, 0.035, 0.035, 0, new THREE.Color(0x222222));
+  for (const s of [-1, 1]) add(seg, 'cyls', s * 5.0, 3.0, z, 0.07, 6, 0.07, 0, kc(0x2f3b44));
+  add(seg, 'boxes', 0, 5.95, z, 10, 0.035, 0.035, 0, kc(0x222222));
   for (let i = 0; i < 9; i++) {
     const t = i / 8, x = -4.8 + t * 9.6, y = 5.85 - 0.45 * Math.sin(t * PI);
     add(seg, 'balls', x, y, z, 0.09, 0.09, 0.09, 0, FANOUS[i % 5]);
   }
   for (let i = 0; i < 4; i++) {                                   // hanging fanous lanterns
     const x = -3.2 + i * 2.1, c = FANOUS[(i + 1) % 5];
-    add(seg, 'cyls', x, 5.35, z, 0.012, 0.6, 0.012, 0, new THREE.Color(0x222222));
+    add(seg, 'cyls', x, 5.35, z, 0.012, 0.6, 0.012, 0, kc(0x222222));
     add(seg, 'balls', x, 4.85, z, 0.2, 0.3, 0.2, 0, c);
     add(seg, 'cones8', x, 5.15, z, 0.17, 0.16, 0.17, 0, GOLD);
     add(seg, 'glows', x, 4.85, z, 0.75, 0.75, 0.75);
@@ -303,9 +311,9 @@ function randomize(seg) {
   seg.gl.length = 0;
   for (const s of [-1, 1]) {
     for (let k = 0; k < 3; k++) house(seg, s, s * rand(11.8, 13.6), -L / 2 + (k + 0.5) * (L / 3) + rand(-1.2, 1.2));
-    for (let k = 0; k < 4; k++) plant(seg, s, s * rand(7.0, 8.8), -L / 2 + (k + 0.5) * (L / 4) + rand(-1.2, 1.2));
-    for (let k = 0; k < 3; k++) bush(seg, s, s * rand(6.25, 6.7), -L / 2 + (k + 0.5) * (L / 3) + rand(-2.5, 2.5));
-    if (Math.random() < 0.5) stall(seg, s, s * 7.4, rand(-9, 9));
+    for (let k = 0, n = LOW ? 3 : 4; k < n; k++) plant(seg, s, s * rand(7.0, 8.8), -L / 2 + (k + 0.5) * (L / n) + rand(-1.2, 1.2));
+    for (let k = 0, n = LOW ? 2 : 3; k < n; k++) bush(seg, s, s * rand(6.25, 6.7), -L / 2 + (k + 0.5) * (L / n) + rand(-2.5, 2.5));
+    if (Math.random() < (LOW ? 0.3 : 0.5)) stall(seg, s, s * 7.4, rand(-9, 9));
     streetLamp(seg, s, -L / 4 + s * 2.2);
     streetLamp(seg, s, L / 4 + s * 2.2);
   }

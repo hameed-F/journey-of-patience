@@ -38,7 +38,11 @@ export class Game {
     this.time = 0; this.tier = 0;
     this.distance = 0;
     this.lives = CFG.maxLives;
-    this.collected = new Set();
+    this.collected = new Set();                 // finished Surahs (ids)
+    this.startSurah = this.startSurah || 0;
+    this.order = [0, 1, 2].map((i) => (this.startSurah + i) % SURAHS.length);   // chosen level first, then the other two
+    this.step = 0; this.doneList = []; this.totalAyahs = 0;
+    this.surah = this.order[0]; this.ayahGot = new Set();   // current Surah and its collected ayah numbers
     this.usedZam = false;
     this.invincible = 0; this.shield = 0; this.sabr = 0;
     this.vt = 0; this.fwT = 0; this.victoryShown = false;
@@ -48,13 +52,16 @@ export class Game {
     this.events.reset();
     UI.setHearts(this.lives, true);
     UI.setSurahs(this.collected);
+    UI.setAyahs(this.surah, this.ayahGot);
+    UI.setTotalAyahs(0);
     UI.setSabr(0, false);
     UI.setDistance(0);
     UI.setTier(TIERS[0].name, true);
   }
 
   // ----- state changes -----
-  start() {
+  start(surahId) {
+    if (surahId !== undefined) this.startSurah = surahId;
     this.env.reset();
     this.reset();
     this.time = this.startOffset;
@@ -65,24 +72,36 @@ export class Game {
     this.state = 'playing';
     UI.show(null);
     UI.hud(true);
-    music.start();
-    music.setTier(this.tier);
+    music.restart();
+    this.enterLevel(true);
+  }
+
+  // glow + chime when a Surah level begins
+  enterLevel(first) {
+    const S = SURAHS[this.surah], p = this.player;
+    UI.levelGlow(S, this.step + 1);
+    if (!first) {
+      sfx.level();
+      UI.flash('rgba(255,236,160,.5)');
+      this.fovKick = 14;
+      this.fx.emit(p.x, 1.2, -1, 90, 0xfff3c4, { speed: 9, up: 3, life: 1.6, grav: -1, spread: 4 });
+      this.fx.emit(p.x, 0.3, -2, 60, 0x7ac0ff, { speed: 5, up: 5, life: 1.8, grav: -2, spread: 3 });
+    }
   }
 
   toMenu() {
     tilawat.stop();
-    music.stop(0.3);
     this.env.reset();
     this.reset();
     this.state = 'menu';
     UI.hud(false);
+    UI.setLevelGlow(false);
     UI.show('menu');
   }
 
   pause() {
     if (this.state !== 'playing') return;
     this.state = 'paused';
-    music.pause();
     ambience.rain(false);
     UI.show('pause');
   }
@@ -90,7 +109,6 @@ export class Game {
   resume() {
     if (this.state !== 'paused') return;
     this.state = 'playing';
-    music.resume();
     if (this.events.cur === 'rain') ambience.rain(true);
     UI.show(null);
   }
@@ -98,30 +116,47 @@ export class Game {
   gameOver() {
     this.state = 'over';
     this.player.die();
-    music.stop(1.4);
     this.events.end(true);
     sfx.over();
     UI.flash('rgba(120,0,0,.45)');
     const score = Math.floor(this.distance);
     if (score > storage.get().best) storage.set({ best: score });
     setTimeout(() => {
-      if (this.state === 'over') { UI.hud(false); UI.showOver({ score, best: storage.get().best, surahs: this.collected.size }); }
+      if (this.state === 'over') {
+        UI.hud(false);
+        UI.showOver({ score, best: storage.get().best, surahs: this.collected.size, recap: this.recap(), names: this.doneList.map((i) => SURAHS[i].name) });
+        if (this.doneList.length) {
+          if (storage.get().sound) tilawat.start(UI.tilawatStatus, this.doneList);
+          else UI.tilawatStatus('Sound is off. Tap Listen to hear the Surah you completed.');
+        }
+      }
     }, 1000);
   }
 
   victory() {
     this.state = 'victory';
     this.player.celebrate();
-    music.stop(1.5);
     this.events.end(true);
     sfx.win();
     UI.flash('rgba(255,211,107,.55)');
+    UI.banner('الحمد لله', 'Journey complete');
     ACH.unlock('journey');
     if (this.lives >= CFG.maxLives) ACH.unlock('perfect');
     if (!this.usedZam) ACH.unlock('independent');
     if (this.time >= 90) ACH.unlock('resilient');
     const score = Math.floor(this.distance);
     if (score > storage.get().best) storage.set({ best: score });
+  }
+
+  // every ayah of the Surahs finished (or being finished) in this run, for the end screens
+  recap() {
+    const out = [];
+    for (const id of this.order) {
+      const S = SURAHS[id];
+      const got = id === this.surah && !this.collected.has(id) ? this.ayahGot : this.collected.has(id) ? new Set(S.ayat.map((_, i) => i + 1)) : new Set();
+      for (const n of [...got].sort((a, b) => a - b)) out.push({ s: S.name, n, ...S.ayat[n - 1] });
+    }
+    return out;
   }
 
   // ----- input -----
@@ -147,22 +182,40 @@ export class Game {
         this.invincible = CFG.invincible;
         break;
       case 'near':
-        UI.toast('Close call!');
+        UI.toast('شكراً لله', true);
         sfx.near();
         this.fovKick = 6;
         this.fx.emit(p.x, 1.1, 0.4, 10, 0xffffff, { speed: 3, up: 0.5, life: 0.4, grav: 0 });
         break;
-      case 'surah':
-        this.collected.add(ev.id);
-        UI.setSurahs(this.collected, ev.id);
-        UI.toast(`${SURAHS[ev.id].name} collected`);
-        sfx.collect();
-        this.fx.emit(ev.x, ev.y, ev.z, 60, 0xffd36b, { speed: 5.5, up: 2, life: 1.1, grav: 4 });
-        this.fx.emit(p.x, 1.2, 0, 30, 0xfff3c4, { speed: 3, up: 3, life: 1.0, grav: 2 });
-        if (this.collected.size === 1) ACH.unlock('first');
-        if (this.collected.size === 2) ACH.unlock('determined');
-        if (this.collected.size >= SURAHS.length) this.victory();
+      case 'ayah': {
+        const S = SURAHS[ev.surah];
+        if (ev.surah !== this.surah || this.ayahGot.has(ev.n)) break;
+        this.ayahGot.add(ev.n);
+        this.totalAyahs++;
+        UI.setTotalAyahs(this.totalAyahs);
+        UI.showAyah(S, ev.n);
+        UI.setAyahs(this.surah, this.ayahGot, ev.n);
+        sfx.ayah(ev.n);
+        this.fx.emit(ev.x, ev.y, ev.z, 40, 0xffd36b, { speed: 5, up: 2, life: 1.0, grav: 4 });
+        this.fx.emit(p.x, 1.2, 0, 16, 0xfff3c4, { speed: 3, up: 3, life: 0.9, grav: 2 });
+        if (this.ayahGot.size >= S.ayahs) {                      // the whole Surah is complete
+          this.collected.add(this.surah);
+          this.doneList.push(this.surah);
+          storage.set({ done: { ...storage.get().done, [this.surah]: true } });
+          UI.setSurahs(this.collected, this.surah);
+          UI.toast(`${S.name} complete`);
+          sfx.collect();
+          this.fx.emit(p.x, 1.2, 0, 70, 0xffd36b, { speed: 6, up: 3, life: 1.2, grav: 3 });
+          UI.flash('rgba(255,211,107,.28)');
+          if (this.collected.size === 1) ACH.unlock('first');
+          if (this.collected.size === 2) ACH.unlock('determined');
+          if (this.collected.size >= SURAHS.length) { this.victory(); break; }
+          this.step++; this.surah = this.order[this.step]; this.ayahGot = new Set();
+          UI.setAyahs(this.surah, this.ayahGot);
+          this.enterLevel(false);
+        }
         break;
+      }
       case 'zamzam':
         this.lives = Math.min(CFG.maxLives, this.lives + 1);
         this.usedZam = true;
@@ -208,7 +261,6 @@ export class Game {
         this.tier = ti;
         UI.setTier(TIERS[ti].name);
         UI.toast(`Difficulty: ${TIERS[ti].name}`);
-        music.setTier(ti);
       }
       this.speed = speedFor(this.time);
       this.distance += this.speed * dt;
@@ -232,7 +284,7 @@ export class Game {
     this.player.update(dt, this.invincible, this.shield);
 
     const ctx = {
-      ti: this.tier, mods: this.mods, speed: this.speed, lives: this.lives, collected: this.collected,
+      ti: this.tier, mods: this.mods, speed: this.speed, lives: this.lives, collected: this.collected, surah: Math.min(this.surah, SURAHS.length - 1), ayahGot: this.ayahGot,
     };
     if (s === 'playing') {
       for (const ev of this.spawner.update(dt, this.speed, ctx, true)) this.handle(ev);
@@ -248,6 +300,14 @@ export class Game {
 
     if (this.state === 'victory') this.victoryTick(dt);
 
+    if (s === 'playing') {
+      this.sparkT = (this.sparkT || 0) - dt;
+      const a = this.spawner.ayahOnField();
+      if (a && this.sparkT <= 0) {
+        this.sparkT = 0.12;
+        this.fx.emit(a.position.x + (Math.random() - 0.5) * 1.2, a.position.y + (Math.random() - 0.5) * 1.2, a.position.z, 1, a.userData.theme, { speed: 0.6, up: 0.8, life: 0.8, grav: -0.5 });
+      }
+    }
     this.env.update(dt);
     this.fx.update(dt);
     this.updateCamera(dt);
@@ -266,8 +326,9 @@ export class Game {
     if (this.vt > 2.6 && !this.victoryShown) {
       this.victoryShown = true;
       UI.hud(false);
-      UI.showVictory({ score: Math.floor(this.distance) });
-      tilawat.start(UI.tilawatStatus);              // autoplay; the button replays it
+      UI.showVictory({ score: Math.floor(this.distance), recap: this.recap() });
+      if (storage.get().sound) tilawat.start(UI.tilawatStatus, this.doneList);   // autoplay; the button replays it
+      else UI.tilawatStatus('Sound is off. Tap Replay Tilawat to listen.');
     }
   }
 
