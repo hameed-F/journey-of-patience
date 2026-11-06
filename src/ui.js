@@ -133,7 +133,7 @@ export function showAyah(S, n) {
   b.innerHTML = `<div class="ab-ar" dir="rtl">${a.ar}</div><div class="ab-en">${a.en}</div>`;
   b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   clearTimeout(ayahTimer);
-  ayahTimer = setTimeout(() => b.classList.remove('show'), 3800);
+  ayahTimer = setTimeout(() => b.classList.remove('show'), 1000);
 }
 
 // golden glow when a new Surah level begins
